@@ -1,0 +1,46 @@
+from backend.app import db
+from flask_login import UserMixin
+from datetime import datetime
+
+
+class User(db.Model, UserMixin):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    queues = db.relationship('Queue', backref='owner', lazy=True)
+    media_items = db.relationship('MediaItem', backref='owner', lazy=True)
+
+    def to_dict(self):
+        return dict(id=self.id, username=self.username, email=self.email)
+
+
+class Queue(db.Model):
+    __tablename__ = 'queues'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    media_items = db.relationship('MediaItem', backref='queue', lazy=True)
+
+    def to_dict(self):
+        return dict(id=self.id, title=self.title, description=self.description, user_id=self.user_id)
+
+
+class MediaItem(db.Model):
+    __tablename__ = 'media_items'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(300), nullable=False)
+    kind = db.Column(db.String(50))
+    notes = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    queue_id = db.Column(db.Integer, db.ForeignKey('queues.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return dict(id=self.id, title=self.title, kind=self.kind, notes=self.notes, user_id=self.user_id, queue_id=self.queue_id)
