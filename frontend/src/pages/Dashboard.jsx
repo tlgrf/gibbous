@@ -1,8 +1,10 @@
 import React, {useEffect, useState} from 'react'
+import { Navigate } from 'react-router-dom'
 import Kanban from '../components/Kanban'
 
 export default function Dashboard(){
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(undefined) // undefined -> loading, null -> not authed
+  const [csrf, setCsrf] = useState(null)
   const [queues, setQueues] = useState([])
   const [items, setItems] = useState([])
   const [newQueueTitle, setNewQueueTitle] = useState('')
@@ -10,13 +12,21 @@ export default function Dashboard(){
   const [selectedQueue, setSelectedQueue] = useState(null)
   const [trio, setTrio] = useState(null)
 
+  const authHeaders = () => {
+    const h = { 'Content-Type': 'application/json' }
+    if (csrf) h['X-CSRF-Token'] = csrf
+    return h
+  }
+
   async function loadAll(){
     const me = await fetch('/api/me', {credentials:'include'}).then(r=>r.json())
-    setUser(me.user)
+    setUser(me.user || null)
+    setCsrf(me.csrf || null)
+    if (!me.user) return
     const qs = await fetch('/api/queues', {credentials:'include'}).then(r=>r.json())
-    setQueues(qs || [])
+    setQueues(Array.isArray(qs) ? qs : [])
     const its = await fetch('/api/media-items', {credentials:'include'}).then(r=>r.json())
-    setItems(its || [])
+    setItems(Array.isArray(its) ? its : [])
   }
 
   useEffect(()=>{ loadAll() }, [])
@@ -24,7 +34,12 @@ export default function Dashboard(){
   async function createQueue(e){
     e.preventDefault()
     if(!newQueueTitle) return
-    await fetch('/api/queues', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({title:newQueueTitle})})
+    await fetch('/api/queues', {
+      method:'POST',
+      headers: authHeaders(),
+      credentials:'include',
+      body:JSON.stringify({title:newQueueTitle})
+    })
     setNewQueueTitle('')
     loadAll()
   }
@@ -32,7 +47,12 @@ export default function Dashboard(){
   async function createItem(e){
     e.preventDefault()
     if(!newItemTitle || !selectedQueue) return
-    await fetch('/api/media-items', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({title:newItemTitle, queue_id:selectedQueue})})
+    await fetch('/api/media-items', {
+      method:'POST',
+      headers: authHeaders(),
+      credentials:'include',
+      body:JSON.stringify({title:newItemTitle, queue_id:selectedQueue})
+    })
     setNewItemTitle('')
     loadAll()
   }
@@ -51,14 +71,35 @@ export default function Dashboard(){
       requestTonight(queueId)
       return
     }
-    await fetch(`/api/queues/${queueId}/reorder`, {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({items: itemsPayload})})
+    await fetch(`/api/queues/${queueId}/reorder`, {
+      method:'POST',
+      headers: authHeaders(),
+      credentials:'include',
+      body:JSON.stringify({items: itemsPayload})
+    })
     loadAll()
   }
+
+  async function logout(){
+    await fetch('/api/logout', {
+      method:'POST',
+      headers: csrf ? {'X-CSRF-Token': csrf} : {},
+      credentials:'include'
+    })
+    setUser(null)
+  }
+
+  // Loading state
+  if (user === undefined) return null
+  if (user === null) return <Navigate to="/login" replace />
 
   return (
     <div>
       <h2 className="text-xl mb-2">Dashboard</h2>
-      <div className="mb-4">User: {user ? user.username : 'not logged in'}</div>
+     <div className="mb-4 flex items-center gap-3">
+       <span>User: {user ? user.username : 'not logged in'}</span>
+       <button onClick={logout} className="text-sm text-red-600 underline">Logout</button>
+     </div>
 
       <div className="mb-6">
         <form onSubmit={createQueue} className="flex gap-2">
