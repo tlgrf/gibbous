@@ -5,9 +5,8 @@ from backend.app import create_app, db
 def run():
     app = create_app()
     with app.app_context():
-        db.create_all()
-        print('DB ensured')
-
+        # Alembic migrations for schema
+        print('App context ready (apply migrations via: flask db upgrade)')
 
 if __name__ == '__main__':
     run()
