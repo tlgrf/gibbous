@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from dotenv import load_dotenv
 import os
 
@@ -8,6 +9,7 @@ load_dotenv()
 
 db = SQLAlchemy()
 login_manager = LoginManager()
+migrate = Migrate()
 
 
 def create_app():
@@ -18,15 +20,16 @@ def create_app():
 
     db.init_app(app)
     login_manager.init_app(app)
+    migrate.init_app(app, db)
 
-    # import models so they are registered with SQLAlchemy
+    # import models registered with SQLAlchemy
     from backend import models
 
-    # create tables
+    # tables
     with app.app_context():
         db.create_all()
 
-    # register API blueprint
+    # API blueprint
     from backend.routes import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
