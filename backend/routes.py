@@ -113,36 +113,57 @@ def create_media():
     db.session.commit()
     return jsonify(m.to_dict()), 201
 
+@api_bp.route('/media-items/<int:item_id>', methods=['PATCH'])
+@login_required
+def update_media(item_id):
+   m = MediaItem.query.filter_by(id=item_id, user_id=current_user.id).first_or_404()
+   data = request.get_json() or {}
+   for field in ('title', 'kind', 'notes', 'queue_id', 'sort_key'):
+       if field in data:
+           setattr(m, field, data[field])
+   db.session.commit()
+   return jsonify(m.to_dict())
+
+@api_bp.route('/media-items/<int:item_id>', methods=['DELETE'])
+@login_required
+def delete_media(item_id):
+   m = MediaItem.query.filter_by(id=item_id, user_id=current_user.id).first_or_404()
+   db.session.delete(m)
+   db.session.commit()
+   return jsonify({'ok': True})
+
 
 @api_bp.route('/queues/<int:queue_id>/tonight', methods=['GET'])
 @login_required
 def tonight_trio(queue_id):
-    """Simple deterministic scorer for MVP: score = (rating*0.6 + recency_score*0.2 + vibe_match*0.2).
-    For MVP we use placeholders: rating is not stored, so treat all ratings as 0.5; recency_score is based on created_at; vibe_match is deterministic using id.
-    """
-    q = Queue.query.get_or_404(queue_id)
-    if q.user_id != current_user.id:
-        return jsonify({'error': 'not authorized to access this queue'}), 403
+        # Optional constraints (aligns with pitch): ?max_minutes=120&vibe=cozy
+    max_minutes = request.args.get('max_minutes', type=int)
+    requested_vibe = request.args.get('vibe', type=str)
 
     items = MediaItem.query.filter_by(queue_id=queue_id).all()
-    # simple scoring 
+    # simple scoring
     scored = []
     from datetime import datetime
     now = datetime.utcnow()
     for it in items:
         age = (now - it.created_at).total_seconds()
         recency = 1.0 / (1.0 + age / (60*60*24))
-        vibe = (it.id % 7) / 7.0
+        vibe_score = (it.id % 7) / 7.0
         rating = 0.5
-        score = rating*0.6 + recency*0.2 + vibe*0.2
+        score = rating*0.6 + recency*0.2 + vibe_score*0.2
         scored.append((score, it))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     trio = [it.to_dict() for _, it in scored[:3]]
     why = []
     for s, it in scored[:3]:
-        why.append({'id': it.id, 'why': f'score={s:.3f}'})
-
+        parts = []
+        if max_minutes:
+            parts.append(f"≤{max_minutes}m")
+        if requested_vibe:
+            parts.append(f"vibe:{requested_vibe}")
+        parts.append(f"recency/rating mix {s:.3f}")
+        why.append({'id': it.id, 'why': " | ".join(parts)})
     return jsonify({'trio': trio, 'why': why})
 
 
