@@ -1,5 +1,5 @@
 import secrets
-from flask import session, request, abort
+from flask import session, request, jsonify
 
 CSRF_KEY = "_csrf"
 
@@ -22,8 +22,12 @@ def ensure_csrf():
         # allow non-API routes (static, index) to pass without header
         if not request.path.startswith('/api/'):
             return
+        # Exempt initial auth endpoints (no session/CSRF yet)
+        if request.path in ('/api/login', '/api/register'):
+            return
         token = request.headers.get('X-CSRF-Token')
         if not token or token != session.get(CSRF_KEY):
-            abort(400, description='Bad CSRF token')
+            # Return JSON instead of HTML error page so frontend can show a message
+            return jsonify({'error': 'Bad CSRF token'}), 400
     # GET/HEAD/OPTIONS are safe
     return
