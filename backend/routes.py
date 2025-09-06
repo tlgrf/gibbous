@@ -3,9 +3,13 @@ from backend.app import db, login_manager
 from backend.models import User, Queue, MediaItem
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from backend.security import issue_csrf
 
 api_bp = Blueprint('api', __name__)
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    return jsonify({'error': 'unauthorized'}), 401
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -58,8 +62,10 @@ def logout():
 @api_bp.route('/me', methods=['GET'])
 def me():
     if not current_user.is_authenticated:
-        return jsonify({'user': None})
-    return jsonify({'user': current_user.to_dict()})
+        return jsonify({'user': None, 'csrf': None})
+    # also issue CSRF token for client to attach on mutations
+    token = issue_csrf()
+    return jsonify({'user': current_user.to_dict(), 'csrf': token})
 
 
 #queues
