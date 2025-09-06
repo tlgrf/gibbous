@@ -8,14 +8,24 @@ export default function Register(){
 
   async function submit(e){
     e.preventDefault()
-    const res = await fetch('/api/register', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username,email,password}),
-      credentials: 'include'
-    })
-    const data = await res.json()
-    if(!res.ok) setMsg(data.error || 'error')
-    else setMsg('registered')
+    setMsg(null)
+    try {
+      const res = await fetch('/api/register', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username,email,password}),
+        credentials: 'include'
+      })
+      let data = null
+      try { data = await res.json() } catch {_=>{}}
+      if(!res.ok) {
+        setMsg((data && (data.error || data.message)) || `HTTP ${res.status}`)
+        return
+      }
+      setMsg('registered')
+    } catch (err) {
+      setMsg(String(err))
+    }
   }
 
   return (
@@ -25,7 +35,7 @@ export default function Register(){
       <input className="border p-2 w-full mb-2" value={email} onChange={e=>setEmail(e.target.value)} placeholder='email' />
       <input className="border p-2 w-full mb-2" value={password} onChange={e=>setPassword(e.target.value)} placeholder='password' type='password' />
       <button className="bg-blue-600 text-white px-3 py-1 rounded" type='submit'>Register</button>
-      {msg && <div className="mt-2">{msg}</div>}
+      {msg && <div className="mt-2 text-red-600">{msg}</div>}
     </form>
   )
 }
