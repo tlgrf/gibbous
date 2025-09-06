@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -15,8 +15,15 @@ migrate = Migrate()
 def create_app():
     app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///gibbous.db')
+
+    # Prefer instance DB path for local dev unless DATABASE_URL provided
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///instance/gibbous.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Session cookie hardening (set SECURE=True in production with HTTPS)
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = False
 
     db.init_app(app)
     login_manager.init_app(app)
@@ -25,9 +32,12 @@ def create_app():
     # import models registered with SQLAlchemy
     from backend import models
 
-    # tables
-    with app.app_context():
-        db.create_all()
+    # CSRF: verify on mutating API routes
+    from backend.security import ensure_csrf
+    @app.before_request
+    def _csrf_guard():
+        if request.path.startswith('/api/'):
+            ensure_csrf()
 
     # API blueprint
     from backend.routes import api_bp
