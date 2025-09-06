@@ -138,3 +138,33 @@ def tonight_trio(queue_id):
         why.append({'id': it.id, 'why': f'score={s:.3f}'})
 
     return jsonify({'trio': trio, 'why': why})
+
+
+@api_bp.route('/queues/<int:queue_id>/reorder', methods=['POST'])
+@login_required
+def reorder_queue(queue_id):
+    q = Queue.query.get_or_404(queue_id)
+    if q.user_id != current_user.id:
+        return jsonify({'error': 'not authorized to access this queue'}), 403
+
+    data = request.get_json() or {}
+    items = data.get('items')  # expected: [{id: int, sort_key: float}, ...]
+    if not isinstance(items, list):
+        return jsonify({'error': 'items array required'}), 400
+
+    # update inside a transaction
+    try:
+        for it in items:
+            mid = it.get('id')
+            sk = it.get('sort_key')
+            if mid is None or sk is None:
+                continue
+            mi = MediaItem.query.filter_by(id=mid, queue_id=queue_id, user_id=current_user.id).first()
+            if mi:
+                mi.sort_key = float(sk)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'failed to reorder', 'detail': str(e)}), 500
+
+    return jsonify({'ok': True})

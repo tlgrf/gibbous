@@ -38,9 +38,10 @@ class MediaItem(db.Model):
     title = db.Column(db.String(300), nullable=False)
     kind = db.Column(db.String(50))
     notes = db.Column(db.Text)
+    sort_key = db.Column(db.Float, default=0.0)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     queue_id = db.Column(db.Integer, db.ForeignKey('queues.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
-        return dict(id=self.id, title=self.title, kind=self.kind, notes=self.notes, user_id=self.user_id, queue_id=self.queue_id)
+        return dict(id=self.id, title=self.title, kind=self.kind, notes=self.notes, user_id=self.user_id, queue_id=self.queue_id, sort_key=self.sort_key)
