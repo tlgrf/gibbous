@@ -26,7 +26,8 @@ class Queue(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    media_items = db.relationship('MediaItem', backref='queue', lazy=True)
+    # Delete items when the queue goes away (prevents orphans)
+    media_items = db.relationship('MediaItem', backref='queue', lazy=True, cascade="all, delete-orphan")
 
     def to_dict(self):
         return dict(id=self.id, title=self.title, description=self.description, user_id=self.user_id)
