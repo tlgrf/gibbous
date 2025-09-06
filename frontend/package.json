@@ -10,7 +10,10 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.1"
+  "react-router-dom": "^6.14.1",
+  "@dnd-kit/core": "^6.0.6",
+  "@dnd-kit/sortable": "^6.0.6",
+  "@dnd-kit/utilities": "^6.0.6"
   },
   "devDependencies": {
     "vite": "^5.0.0",

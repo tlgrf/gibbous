@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react'
-import KanbanPlaceholder from '../components/KanbanPlaceholder'
+import Kanban from '../components/Kanban'
 
 export default function Dashboard(){
   const [user, setUser] = useState(null)
@@ -45,6 +45,16 @@ export default function Dashboard(){
     }
   }
 
+  async function reorder(queueId, itemsPayload){
+    // if payload is empty, treat as request for tonight
+    if(itemsPayload && itemsPayload.length === 0){
+      requestTonight(queueId)
+      return
+    }
+    await fetch(`/api/queues/${queueId}/reorder`, {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({items: itemsPayload})})
+    loadAll()
+  }
+
   return (
     <div>
       <h2 className="text-xl mb-2">Dashboard</h2>
@@ -69,8 +79,8 @@ export default function Dashboard(){
       </div>
 
       <div className="mb-6">
-        <h3 className="font-semibold mb-2">Kanban (placeholder)</h3>
-        <KanbanPlaceholder queues={queues} items={items} onTonight={requestTonight} />
+  <h3 className="font-semibold mb-2">Kanban</h3>
+  <Kanban queues={queues} items={items} onReorder={reorder} />
       </div>
 
       {trio && (
