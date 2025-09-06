@@ -1,0 +1,87 @@
+import React, {useEffect, useState} from 'react'
+import KanbanPlaceholder from '../components/KanbanPlaceholder'
+
+export default function Dashboard(){
+  const [user, setUser] = useState(null)
+  const [queues, setQueues] = useState([])
+  const [items, setItems] = useState([])
+  const [newQueueTitle, setNewQueueTitle] = useState('')
+  const [newItemTitle, setNewItemTitle] = useState('')
+  const [selectedQueue, setSelectedQueue] = useState(null)
+  const [trio, setTrio] = useState(null)
+
+  async function loadAll(){
+    const me = await fetch('/api/me', {credentials:'include'}).then(r=>r.json())
+    setUser(me.user)
+    const qs = await fetch('/api/queues', {credentials:'include'}).then(r=>r.json())
+    setQueues(qs || [])
+    const its = await fetch('/api/media-items', {credentials:'include'}).then(r=>r.json())
+    setItems(its || [])
+  }
+
+  useEffect(()=>{ loadAll() }, [])
+
+  async function createQueue(e){
+    e.preventDefault()
+    if(!newQueueTitle) return
+    await fetch('/api/queues', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({title:newQueueTitle})})
+    setNewQueueTitle('')
+    loadAll()
+  }
+
+  async function createItem(e){
+    e.preventDefault()
+    if(!newItemTitle || !selectedQueue) return
+    await fetch('/api/media-items', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({title:newItemTitle, queue_id:selectedQueue})})
+    setNewItemTitle('')
+    loadAll()
+  }
+
+  async function requestTonight(queueId){
+    const res = await fetch(`/api/queues/${queueId}/tonight`, {credentials:'include'})
+    if(res.ok){
+      const data = await res.json()
+      setTrio(data)
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl mb-2">Dashboard</h2>
+      <div className="mb-4">User: {user ? user.username : 'not logged in'}</div>
+
+      <div className="mb-6">
+        <form onSubmit={createQueue} className="flex gap-2">
+          <input className="border p-2" placeholder="New queue title" value={newQueueTitle} onChange={e=>setNewQueueTitle(e.target.value)} />
+          <button className="bg-green-600 text-white px-3 rounded" type="submit">Create Queue</button>
+        </form>
+      </div>
+
+      <div className="mb-6">
+        <form onSubmit={createItem} className="flex gap-2">
+          <input className="border p-2" placeholder="New item title" value={newItemTitle} onChange={e=>setNewItemTitle(e.target.value)} />
+          <select value={selectedQueue || ''} onChange={e=>setSelectedQueue(parseInt(e.target.value) || null)} className="border p-2">
+            <option value=''>Select queue</option>
+            {queues.map(q=> <option key={q.id} value={q.id}>{q.title}</option>)}
+          </select>
+          <button className="bg-blue-600 text-white px-3 rounded" type="submit">Add Item</button>
+        </form>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="font-semibold mb-2">Kanban (placeholder)</h3>
+        <KanbanPlaceholder queues={queues} items={items} onTonight={requestTonight} />
+      </div>
+
+      {trio && (
+        <div className="border p-3 bg-gray-50">
+          <h4 className="font-semibold">Tonight Trio</h4>
+          <ul>
+            {trio.trio.map(i=> <li key={i.id}>{i.title} — <em>{i.kind}</em></li>)}
+          </ul>
+          <div className="text-sm mt-2">Why: {trio.why.map(w=> `${w.id}:${w.why}`).join(' | ')}</div>
+        </div>
+      )}
+    </div>
+  )
+}

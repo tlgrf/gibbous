@@ -22,7 +22,7 @@ def create_app():
     # import models so they are registered with SQLAlchemy
     from backend import models
 
-    # create tables in dev if they don't exist
+    # create tables
     with app.app_context():
         db.create_all()
 
