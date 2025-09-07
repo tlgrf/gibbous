@@ -1,18 +1,15 @@
 import React from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
+import Navbar from './components/Navbar'
 
 export default function App(){
+  const { pathname } = useLocation()
+  const hideNav = pathname === '/login' || pathname === '/register'
+
   return (
-    <div className="p-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">Gibbous</h1>
-        <nav className="mt-2 space-x-4">
-          <Link to="/dashboard" className="text-blue-600">Dashboard</Link>
-          <Link to="/login" className="text-blue-600"> Login</Link>
-          <Link to="/register" className="text-blue-600"> Register</Link>
-        </nav>
-      </header>
-      <main>
+    <div className="min-h-screen bg-gray-50">
+      {!hideNav && <Navbar />}
+      <main className="max-w-5xl mx-auto px-4 py-6">
         <Outlet />
       </main>
     </div>

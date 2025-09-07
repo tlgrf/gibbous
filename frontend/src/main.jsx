@@ -12,7 +12,7 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <Routes>
         <Route path='/' element={<App />}>
-          <Route index element={<Navigate to='/dashboard' replace />} />
+          <Route index element={<Navigate to='/login' replace />} />
           <Route path='login' element={<Login />} />
           <Route path='register' element={<Register />} />
           <Route path='dashboard' element={<Dashboard />} />

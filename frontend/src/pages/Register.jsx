@@ -1,10 +1,12 @@
 import React, {useState} from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 
 export default function Register(){
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState(null)
+  const nav = useNavigate()
 
   async function submit(e){
     e.preventDefault()
@@ -18,24 +20,31 @@ export default function Register(){
       })
       let data = null
       try { data = await res.json() } catch {_=>{}}
-      if(!res.ok) {
+  if(!res.ok) {
         setMsg((data && (data.error || data.message)) || `HTTP ${res.status}`)
         return
       }
-      setMsg('registered')
+  // backend logs you in on register; go to dashboard
+  nav('/dashboard', { replace: true })
     } catch (err) {
       setMsg(String(err))
     }
   }
 
   return (
-    <form onSubmit={submit} className="max-w-md">
-      <h2 className="text-xl mb-2">Register</h2>
-      <input className="border p-2 w-full mb-2" value={username} onChange={e=>setUsername(e.target.value)} placeholder='username' />
-      <input className="border p-2 w-full mb-2" value={email} onChange={e=>setEmail(e.target.value)} placeholder='email' />
-      <input className="border p-2 w-full mb-2" value={password} onChange={e=>setPassword(e.target.value)} placeholder='password' type='password' />
-      <button className="bg-blue-600 text-white px-3 py-1 rounded" type='submit'>Register</button>
-      {msg && <div className="mt-2 text-red-600">{msg}</div>}
-    </form>
+    <div className="min-h-[60vh] grid place-items-center">
+      <form onSubmit={submit} className="w-full max-w-md border bg-white p-6 rounded-xl shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Register</h2>
+        <input className="border p-2 w-full mb-2 rounded" value={username} onChange={e=>setUsername(e.target.value)} placeholder='username' />
+        <input className="border p-2 w-full mb-2 rounded" value={email} onChange={e=>setEmail(e.target.value)} placeholder='email' />
+        <input className="border p-2 w-full mb-4 rounded" value={password} onChange={e=>setPassword(e.target.value)} placeholder='password' type='password' />
+        <button className="bg-blue-600 text-white px-4 py-2 rounded w-full" type='submit'>Register</button>
+        {msg && <div className="mt-2 text-red-600">{msg}</div>}
+        <div className="mt-4 text-sm text-center">
+          Already have an account?{' '}
+          <Link to="/login" className="text-blue-600 underline">Log in</Link>
+        </div>
+      </form>
+    </div>
   )
 }
