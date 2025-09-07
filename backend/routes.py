@@ -94,7 +94,11 @@ def create_queue():
 @api_bp.route('/media-items', methods=['GET'])
 @login_required
 def list_media():
-    items = MediaItem.query.filter_by(user_id=current_user.id).all()
+    status = request.args.get('status')
+    query = MediaItem.query.filter_by(user_id=current_user.id)
+    if status:
+        query = query.filter_by(status=status)
+    items = query.all()
     return jsonify([i.to_dict() for i in items])
 
 
@@ -106,9 +110,19 @@ def create_media():
     kind = data.get('kind')
     notes = data.get('notes')
     queue_id = data.get('queue_id')
+    status = data.get('status') or 'queued'
+    vibes = data.get('vibes')
+    rating = data.get('rating')
+    # accept array or CSV for vibes
+    if isinstance(vibes, list):
+        vibes = ",".join([str(v).strip() for v in vibes if v])
     if not title:
         return jsonify({'error': 'title required'}), 400
-    m = MediaItem(title=title, kind=kind, notes=notes, user_id=current_user.id, queue_id=queue_id)
+    m = MediaItem(
+        title=title, kind=kind, notes=notes,
+        user_id=current_user.id, queue_id=queue_id,
+        status=status, vibes=vibes, rating=rating
+    )
     db.session.add(m)
     db.session.commit()
     return jsonify(m.to_dict()), 201
@@ -116,13 +130,22 @@ def create_media():
 @api_bp.route('/media-items/<int:item_id>', methods=['PATCH'])
 @login_required
 def update_media(item_id):
-   m = MediaItem.query.filter_by(id=item_id, user_id=current_user.id).first_or_404()
-   data = request.get_json() or {}
-   for field in ('title', 'kind', 'notes', 'queue_id', 'sort_key'):
-       if field in data:
-           setattr(m, field, data[field])
-   db.session.commit()
-   return jsonify(m.to_dict())
+    m = MediaItem.query.filter_by(id=item_id, user_id=current_user.id).first_or_404()
+    data = request.get_json() or {}
+    # Normalize vibes if provided
+    if 'vibes' in data:
+        v = data.get('vibes')
+        if isinstance(v, list):
+            data['vibes'] = ",".join([str(x).strip() for x in v if x])
+        elif isinstance(v, str):
+            data['vibes'] = ",".join([x.strip() for x in v.split(',') if x.strip()])
+    # Only allow known fields
+    allowed = {'title','kind','notes','queue_id','sort_key','status','vibes','rating'}
+    for field, val in data.items():
+        if field in allowed:
+            setattr(m, field, val)
+    db.session.commit()
+    return jsonify(m.to_dict())
 
 @api_bp.route('/media-items/<int:item_id>', methods=['DELETE'])
 @login_required
@@ -141,28 +164,37 @@ def tonight_trio(queue_id):
     requested_vibe = request.args.get('vibe', type=str)
 
     items = MediaItem.query.filter_by(queue_id=queue_id).all()
-    # simple scoring
+    # simple scoring using real fields:
+    # score = 0.5*rating_norm + 0.3*recency + 0.2*vibe_overlap
     scored = []
     from datetime import datetime
     now = datetime.utcnow()
     for it in items:
+        # recency: more recent -> closer to 1
         age = (now - it.created_at).total_seconds()
         recency = 1.0 / (1.0 + age / (60*60*24))
-        vibe_score = (it.id % 7) / 7.0
-        rating = 0.5
-        score = rating*0.6 + recency*0.2 + vibe_score*0.2
-        scored.append((score, it))
+        # rating normalized (fallback to 5/10 if none)
+        rating_norm = ((it.rating if it.rating is not None else 5) / 10.0)
+        # vibe overlap: 1.0 if requested vibe present, else 0.0 (MVP)
+        item_vibes = set([x.strip() for x in (it.vibes or '').split(',') if x.strip()])
+        vibe_overlap = 0.0
+        if requested_vibe:
+            vibe_overlap = 1.0 if requested_vibe in item_vibes else 0.0
+        score = 0.5*rating_norm + 0.3*recency + 0.2*vibe_overlap
+        scored.append((score, it, recency, rating_norm, vibe_overlap))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    trio = [it.to_dict() for _, it in scored[:3]]
+    trio = [it.to_dict() for _, it, _, _, _ in scored[:3]]
     why = []
-    for s, it in scored[:3]:
+    for s, it, recency, rating_norm, vibe_overlap in scored[:3]:
         parts = []
         if max_minutes:
             parts.append(f"≤{max_minutes}m")
+        # explain fields used
+        parts.append(f"rating {int(round(rating_norm*10))}/10")
+        parts.append(f"recency {recency:.2f}")
         if requested_vibe:
-            parts.append(f"vibe:{requested_vibe}")
-        parts.append(f"recency/rating mix {s:.3f}")
+            parts.append("vibe match" if vibe_overlap > 0 else "vibe no-match")
         why.append({'id': it.id, 'why': " | ".join(parts)})
     return jsonify({'trio': trio, 'why': why})
 

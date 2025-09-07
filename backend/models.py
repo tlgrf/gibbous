@@ -26,7 +26,7 @@ class Queue(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Delete items when the queue goes away (prevents orphans)
+    # Delete items when the queue goes away
     media_items = db.relationship('MediaItem', backref='queue', lazy=True, cascade="all, delete-orphan")
 
     def to_dict(self):
@@ -44,5 +44,21 @@ class MediaItem(db.Model):
     queue_id = db.Column(db.Integer, db.ForeignKey('queues.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # MVP extensions
+    status = db.Column(db.String(20), nullable=False, default='queued')  # queued | in_progress | dropped | finished
+    vibes = db.Column(db.Text)  # CSV string of vibes (e.g., "cozy,wholesome")
+    rating = db.Column(db.Integer, nullable=True)  # 1-10
+
     def to_dict(self):
-        return dict(id=self.id, title=self.title, kind=self.kind, notes=self.notes, user_id=self.user_id, queue_id=self.queue_id, sort_key=self.sort_key)
+        return dict(
+            id=self.id,
+            title=self.title,
+            kind=self.kind,
+            notes=self.notes,
+            user_id=self.user_id,
+            queue_id=self.queue_id,
+            sort_key=self.sort_key,
+            status=self.status,
+            vibes=self.vibes,
+            rating=self.rating,
+        )
