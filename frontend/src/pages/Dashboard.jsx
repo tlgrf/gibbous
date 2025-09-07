@@ -11,6 +11,8 @@ export default function Dashboard(){
   const [newItemTitle, setNewItemTitle] = useState('')
   const [selectedQueue, setSelectedQueue] = useState(null)
   const [trio, setTrio] = useState(null)
+  const [selectedVibes, setSelectedVibes] = useState([])
+  const VIBE_CHOICES = ['cozy','epic','spooky','chill','upbeat','artsy','cerebral','wholesome'] 
 
   const authHeaders = () => {
     const h = { 'Content-Type': 'application/json' }
@@ -27,6 +29,11 @@ export default function Dashboard(){
     setQueues(Array.isArray(qs) ? qs : [])
     const its = await fetch('/api/media-items', {credentials:'include'}).then(r=>r.json())
     setItems(Array.isArray(its) ? its : [])
+  }
+  function toggleVibe(v){
+    setSelectedVibes(prev => (
+      prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]
+    ))
   }
 
   useEffect(()=>{ loadAll() }, [])
@@ -51,9 +58,14 @@ export default function Dashboard(){
       method:'POST',
       headers: authHeaders(),
       credentials:'include',
-      body:JSON.stringify({title:newItemTitle, queue_id:selectedQueue})
-    })
-    setNewItemTitle('')
+      body:JSON.stringify({
+        title:newItemTitle,
+        queue_id:selectedQueue,
+        vibes: selectedVibes
+      })
+     })
+     setNewItemTitle('')
+    setSelectedVibes([])
     loadAll()
   }
 
@@ -115,6 +127,28 @@ export default function Dashboard(){
             <option value=''>Select queue</option>
             {queues.map(q=> <option key={q.id} value={q.id}>{q.title}</option>)}
           </select>
+          {selectedQueue && (
+            <div className="flex flex-wrap gap-2 items-center">
+              {VIBE_CHOICES.map(v => {
+                const active = selectedVibes.includes(v)
+                return (
+                  <button
+                    type="button"
+                    key={v}
+                    onClick={()=>toggleVibe(v)}
+                    className={`px-2 py-1 rounded border text-sm ${
+                      active
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300'
+                    }`}
+                    aria-pressed={active}
+                  >
+                    {v}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <button className="bg-blue-600 text-white px-3 rounded" type="submit">Add Item</button>
         </form>
       </div>
