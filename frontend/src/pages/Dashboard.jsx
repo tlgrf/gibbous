@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react'
 import { Navigate } from 'react-router-dom'
 import Kanban from '../components/Kanban'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Dashboard(){
   const [user, setUser] = useState(undefined) // undefined -> loading, null -> not authed
@@ -13,6 +14,9 @@ export default function Dashboard(){
   const [trio, setTrio] = useState(null)
   const [selectedVibes, setSelectedVibes] = useState([])
   const VIBE_CHOICES = ['cozy','epic','spooky','chill','upbeat','artsy','cerebral','wholesome'] 
+  const [accordionOpen, setAccordionOpen] = useState({})
+  const [confirm, setConfirm] = useState(null) // {type:'queue'|'item', id:number, title:string}
+  const [busy, setBusy] = useState(false)
 
   const authHeaders = () => {
     const h = { 'Content-Type': 'application/json' }
@@ -22,7 +26,7 @@ export default function Dashboard(){
 
   async function loadAll(){
     const me = await fetch('/api/me', {credentials:'include'}).then(r=>r.json())
-    setUser(me.user || null)
+    setUser(me.user)
     setCsrf(me.csrf || null)
     if (!me.user) return
     const qs = await fetch('/api/queues', {credentials:'include'}).then(r=>r.json())
@@ -69,6 +73,11 @@ export default function Dashboard(){
     loadAll()
   }
 
+  function toggleAccordion(qid){
+    setAccordionOpen(prev => ({ ...prev, [qid]: !prev[qid] }))
+  }
+  
+  
   async function requestTonight(queueId){
     const res = await fetch(`/api/queues/${queueId}/tonight`, {credentials:'include'})
     if(res.ok){
@@ -99,6 +108,46 @@ export default function Dashboard(){
       credentials:'include'
     })
     setUser(null)
+  }
+
+  function promptDeleteQueue(q){
+    setConfirm({
+      type: 'queue',
+      id: q.id,
+      title: q.title
+    })
+  }
+
+  function promptDeleteItem(it){
+    setConfirm({
+      type: 'item',
+      id: it.id,
+      title: it.title
+    })
+  }
+
+  async function handleConfirm(){
+    if (!confirm) return
+    try {
+      setBusy(true)
+      if (confirm.type === 'queue') {
+        await fetch(`/api/queues/${confirm.id}`, {
+          method:'DELETE',
+          headers: authHeaders(),
+          credentials:'include'
+        })
+      } else if (confirm.type === 'item') {
+        await fetch(`/api/media-items/${confirm.id}`, {
+          method:'DELETE',
+          headers: authHeaders(),
+          credentials:'include'
+        })
+      }
+    } finally {
+      setBusy(false)
+      setConfirm(null)
+      loadAll()
+    }
   }
 
   // Loading state
@@ -153,6 +202,61 @@ export default function Dashboard(){
         </form>
       </div>
 
+{/* Accordions: Queues list with delete and per-item delete */}
+      <div className="mb-8">
+        <h3 className="font-semibold mb-3">Your Queues</h3>
+        <div className="space-y-3">
+          {queues.length === 0 && (
+            <div className="text-sm text-gray-600">No queues yet. Create one above.</div>
+          )}
+          {queues.map(q => {
+            const open = !!accordionOpen[q.id]
+            const qItems = items.filter(i => i.queue_id === q.id)
+            return (
+              <div key={q.id} className="border rounded-lg bg-white">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <button
+                    onClick={() => toggleAccordion(q.id)}
+                    className="text-left flex-1 font-medium"
+                    aria-expanded={open}
+                  >
+                    {q.title} <span className="text-xs text-gray-500">({qItems.length})</span>
+                  </button>
+                  <button
+                    onClick={() => promptDeleteQueue(q)}
+                    className="text-gray-500 hover:text-red-600"
+                    title="Delete queue"
+                    aria-label={`Delete queue ${q.title}`}
+                  >
+                    ×
+                  </button>
+                </div>
+                {open && (
+                  <ul className="px-3 pb-3 space-y-2">
+                    {qItems.length === 0 && (
+                      <li className="text-sm text-gray-500">No items yet.</li>
+                    )}
+                    {qItems.map(it => (
+                      <li key={it.id} className="flex items-center justify-between border rounded p-2">
+                        <span>{it.title}</span>
+                        <button
+                          onClick={() => promptDeleteItem(it)}
+                          className="text-gray-500 hover:text-red-600"
+                          title="Delete item"
+                          aria-label={`Delete item ${it.title}`}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="mb-6">
   <h3 className="font-semibold mb-2">Kanban</h3>
   <Kanban queues={queues} items={items} onReorder={reorder} />
@@ -167,6 +271,18 @@ export default function Dashboard(){
           <div className="text-sm mt-2">Why: {trio.why.map(w=> `${w.id}:${w.why}`).join(' | ')}</div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.type === 'queue' ? 'Delete queue?' : 'Delete item?'}
+        message={
+          confirm?.type === 'queue'
+            ? `This will delete the queue “${confirm?.title}” and everything in it.`
+            : `This will delete the item “${confirm?.title}”.`
+        }
+        confirmText={confirm?.type === 'queue' ? 'Delete Queue' : 'Delete Item'}
+        onCancel={() => setConfirm(null)}
+        onConfirm={handleConfirm}
+      />
     </div>
   )
 }

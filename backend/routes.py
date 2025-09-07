@@ -89,6 +89,16 @@ def create_queue():
     db.session.commit()
     return jsonify(q.to_dict()), 201
 
+@api_bp.route('/queues/<int:queue_id>', methods=['DELETE'])
+@login_required
+def delete_queue(queue_id):
+    q = Queue.query.get_or_404(queue_id)
+    if q.user_id != current_user.id:
+        return jsonify({'error': 'not authorized to delete this queue'}), 403
+    # models.py has cascade="all, delete-orphan" so related MediaItems are removed
+    db.session.delete(q)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 #media items (that we're going to add in the queue)
 @api_bp.route('/media-items', methods=['GET'])
